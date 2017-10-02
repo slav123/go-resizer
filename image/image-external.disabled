@@ -1,0 +1,142 @@
+package image
+
+import (
+	"fmt"
+
+	"crypto/rand"
+	"io/ioutil"
+	"os"
+	"os/exec"
+	"strconv"
+)
+
+var LastError string
+
+/**
+ * resize image action
+ *
+ * @param inBuf []byte image to resize
+ * @param w, h int width and height
+ * @param c
+ */
+func Resize(inBuf []byte, width int, height int, c bool, t, top, left, aw, ah, angle, quality int) []byte {
+
+	from := "cache/" + randString(16)
+
+	SaveFile(inBuf, from)
+
+	var ext string
+
+	switch t {
+	case 1:
+		ext = "jpeg"
+	case 2:
+		ext = "webp"
+	case 3:
+		ext = "png"
+	default:
+		ext = "jpg"
+
+	}
+
+	to := "%s[Q=" + strconv.FormatUint(uint64(quality), 10) + "]." + ext
+	if width = 0 {
+		width = height
+	} 
+	
+	if height = 0 {
+		height = width
+	}
+
+	var args = []string{
+		"--size", strconv.FormatUint(uint64(width), 10) + "x" + strconv.FormatUint(uint64(height), 10),
+		"--output", to,
+		"-p", "BILINEAR",
+	}
+
+	if c {
+		args = append(args, "--crop")
+	}
+
+	args = append(args, from)
+
+	path, err := exec.LookPath("vipsthumbnail")
+	if err != nil {
+		fmt.Print(err)
+	}
+	cmd := exec.Command(path, args...)
+	z := cmd.Run()
+
+	fmt.Printf("cmd: %v\n", z)
+	fmt.Printf("args: %vn\n", args)
+
+	cacheFile := from + to[2:len(to)]
+	fmt.Println(cacheFile)
+
+	file, _ := ReadFile(cacheFile)
+
+	go os.Remove(cacheFile)
+	go os.Remove(from)
+
+	return file
+}
+
+func ReadFile(filename string) ([]byte, error) {
+	f, err := os.Open(filename)
+
+	if err != nil {
+		return make([]byte, 0), err
+	} else {
+		inBuf, _ := ioutil.ReadAll(f)
+		return inBuf, nil
+	}
+}
+
+func SaveFile(buf []byte, filename string) {
+	// open output file
+	fo, err := os.Create(filename)
+	if err != nil {
+		panic(err)
+	}
+	// close fo on exit and check for its returned error
+	defer func() {
+		if err := fo.Close(); err != nil {
+			panic(err)
+		}
+	}()
+
+	// write a chunk
+	if _, err := fo.Write(buf); err != nil {
+		panic(err)
+	}
+}
+
+func randString(n int) string {
+	const alphanum = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+	var bytes = make([]byte, n)
+	rand.Read(bytes)
+	for i, b := range bytes {
+		bytes[i] = alphanum[b%byte(len(alphanum))]
+	}
+	return string(bytes)
+}
+
+func DetermineImageTypeName(bytes []byte) string {
+
+	if bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47 {
+		return "png"
+	}
+	if bytes[0] == 0xFF && bytes[1] == 0xD8 {
+		return "jpg"
+	}
+	if bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x38 {
+		return "gif"
+	}
+	if bytes[0] == 0x42 && bytes[1] == 0x4D {
+		return "bmp"
+	}
+	if bytes[0] == 0x52 && bytes[1] == 0x49 {
+		return "webp"
+	}
+	return ""
+}
