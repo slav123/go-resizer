@@ -1,0 +1,11 @@
+{
+    "redis_serv":"",
+    "redis_port": "6379",
+    "port": "8000",
+    "sdb.AccessKeyId": "",
+	"sdb.SecretAccessKey": "/s53",
+	"sdb.Region": "ap-southeast-2",
+	"cloudflare.key": "",
+	"cloudflare.email": "",
+	"cloudflare.domain": ""
+}
